@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # LocalVision NVR - Video Akış, Kayıt ve Yapay Zekâ Motoru
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: localvision_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../data:/app/backend/data
+      - ../models:/app/models
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - OFFLINE_ONLY=true
+      - DATABASE_URL=sqlite+aiosqlite:///./data/localvision.db
+      - HOST=0.0.0.0
+      - PORT=8000
+    networks:
+      - localvision_net
+
+  # LocalVision NVR - Web Yönetim Paneli
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: localvision_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - localvision_net
+
+networks:
+  localvision_net:
+    driver: bridge
