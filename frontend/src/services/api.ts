@@ -71,11 +71,27 @@ const mockResponse = <T>(data: T) => Promise.resolve({ data, status: 200, status
 
 export const authApi = {
   login: async (data: { username: string; password: string }) => {
-    if (isDemoMode() || data.username === 'demo') {
+    // Vercel üzerinde veya demo modunda doğrudan giriş sağla
+    const isVercelHost = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+    const hasCustomBackend = Boolean(localStorage.getItem('localvision_api_url'));
+
+    if (isDemoMode() || data.username === 'demo' || (isVercelHost && !hasCustomBackend)) {
       setDemoMode(true);
       return mockResponse(MOCK_USER);
     }
-    return api.post('/auth/login', data);
+
+    try {
+      return await api.post('/auth/login', data);
+    } catch (err: any) {
+      // Backend çevrimdışıysa (veya yerel sunucu henüz açılmadıysa) admin girişini demo modunda aç
+      const isOffline = !err.response || err.response.status === 404 || err.code === 'ERR_NETWORK';
+      if (isOffline && (data.username === 'admin' || isVercelHost)) {
+        console.warn('Backend API ulaşılamadı. Vitrin/Demo modu ile oturum açılıyor.');
+        setDemoMode(true);
+        return mockResponse(MOCK_USER);
+      }
+      throw err;
+    }
   },
   getMe: () => isDemoMode() ? mockResponse(MOCK_USER) : api.get('/auth/me'),
   updatePreferences: (preferences: Record<string, any>) =>
